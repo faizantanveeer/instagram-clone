@@ -12,16 +12,21 @@ router.get('/', function (req, res) {
 });
 
 router.post('/update', upload.single('file'), async function (req, res) {
-	const user = await userModel.findOne({
-		username: req.session.passport.user,
-	});
 
-	await userModel.updateOne({
-		username: req.body.username,
-		fullname: req.body.fullname,
-		bio: req.body.bio,
-		photoPath: req.file.filename,
-	})
+	const user = await userModel.findOneAndUpdate(
+		{ username: req.session.passport.user },
+		{
+			username: req.body.username,
+			fullname: req.body.fullname,
+			bio: req.body.bio,
+		},
+		{ new: true }
+	);
+
+	if (req.file) {
+		user.photoPath = req.file.filename;
+	}
+	await user.save();
 
 	res.redirect('/profile');
 });
@@ -56,7 +61,6 @@ router.get('/edit', isLoggedIn, async function (req, res) {
 	const userData = await userModel.findOne({
 		username: req.session.passport.user,
 	});
-
 
 	res.render('edit', { footer: true, user: userData });
 });
