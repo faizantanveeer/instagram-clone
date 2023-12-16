@@ -3,8 +3,10 @@ const passport = require('passport');
 var router = express.Router();
 const userModel = require('./users');
 const upload = require('./multer');
+const postModel = require('./post');
 
 const localStrategy = require('passport-local');
+const post = require('./post');
 passport.use(new localStrategy(userModel.authenticate()));
 
 router.get('/', function (req, res) {
@@ -31,6 +33,14 @@ router.post('/update', upload.single('file'), async function (req, res) {
 	res.redirect('/profile');
 });
 
+router.get('/upload', isLoggedIn, async function(req, res){
+	const userData = await userModel.findOne({
+		username: req.session.passport.user,
+	});
+
+	res.render('upload', { footer: true, user: userData });
+})
+
 router.get('/login', async function (req, res) {
 	const userData = new userModel({
 		username: req.body.username,
@@ -41,8 +51,13 @@ router.get('/login', async function (req, res) {
 	res.render('login', { footer: false, user: userData });
 });
 
-router.get('/feed', isLoggedIn, function (req, res) {
-	res.render('feed', { footer: true });
+router.get('/feed', isLoggedIn, async function (req, res) {
+	const postData = await postModel.find().populate('users')
+	const userData = await userModel.findOne({
+		username: req.session.passport.user,
+	});
+
+	res.render('feed', { footer: true, user: userData , posts: postData});
 });
 
 router.get('/profile', isLoggedIn, async function (req, res) {
@@ -50,11 +65,16 @@ router.get('/profile', isLoggedIn, async function (req, res) {
 		username: req.session.passport.user,
 	});
 
-	res.render('profile', { footer: true, user: userData });
+	const postData = await postModel.find().populate('users');
+
+	res.render('profile', { footer: true, user: userData, posts: postData });
 });
 
-router.get('/search', isLoggedIn, function (req, res) {
-	res.render('search', { footer: true });
+router.get('/search', isLoggedIn, async function (req, res) {
+	const user = await userModel.findOne({
+		username: req.session.passport.user
+	})
+	res.render('search', { footer: true, user: user});
 });
 
 router.get('/edit', isLoggedIn, async function (req, res) {
@@ -65,8 +85,20 @@ router.get('/edit', isLoggedIn, async function (req, res) {
 	res.render('edit', { footer: true, user: userData });
 });
 
-router.get('/upload', isLoggedIn, function (req, res) {
-	res.render('upload', { footer: true });
+router.post('/upload', isLoggedIn,upload.single('file'), async function (req, res) {
+	const user = await userModel.findOne({
+		username: req.session.passport.user,
+	});
+
+	const post = await postModel.create({
+		photoPath: req.file.filename,
+		caption: req.body.caption,
+		users: user._id
+	});
+
+	user.posts.push(post._id);
+	await user.save();
+	res.redirect('/feed', )
 });
 
 router.post('/register', function (req, res) {
